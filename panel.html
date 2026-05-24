@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUBG Control Panel</title>
+    <style>
+        body {
+            margin: 0; padding: 20px 40px;
+            background-color: #121214; color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .panel-title {
+            color: #f39c12; font-size: 22px; font-weight: bold;
+            border-bottom: 2px solid #333; padding-bottom: 5px;
+            margin-bottom: 20px; margin-top: 30px; text-transform: uppercase;
+        }
+        .panel-title:first-child { margin-top: 0; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; color: #aaa; font-size: 12px; margin-bottom: 5px; font-weight: bold; }
+        .input-group input {
+            width: 100%; background-color: #222226; border: 1px solid #444;
+            color: #fff; padding: 12px; font-size: 16px; border-radius: 4px; box-sizing: border-box;
+        }
+        .input-group input:focus { border-color: #f39c12; outline: none; }
+        .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        
+        .btn {
+            background-color: #f39c12; color: #000; border: none;
+            padding: 15px 30px; font-size: 18px; font-weight: bold;
+            border-radius: 5px; cursor: pointer; transition: 0.2s; width: 100%; margin-top: 20px;
+        }
+        .btn:hover { background-color: #e67e22; }
+        #save-status { color: #2ecc71; text-align: center; margin-top: 10px; font-weight: bold; opacity: 0; transition: 0.3s; }
+    </style>
+</head>
+<body>
+
+    <div class="panel-title">1. API CONFIGURATION</div>
+    <div class="input-group">
+        <label>Account ID:</label>
+        <input type="text" id="inp-acc" value="nttapon7799">
+    </div>
+    <div class="input-group">
+        <label>Tournament ID (Series):</label>
+        <input type="text" id="inp-tour" value="kr-pws1ws1">
+    </div>
+
+    <div class="panel-title">2. TEAMS IN TOP 4 (ซ้ายไปขวา)</div>
+    <div class="team-grid">
+        <div class="input-group"><label>Slot 1 Team Tag:</label><input type="text" id="inp-t1"></div>
+        <div class="input-group"><label>Slot 2 Team Tag:</label><input type="text" id="inp-t2"></div>
+        <div class="input-group"><label>Slot 3 Team Tag:</label><input type="text" id="inp-t3"></div>
+        <div class="input-group"><label>Slot 4 Team Tag:</label><input type="text" id="inp-t4"></div>
+    </div>
+
+    <button class="btn" onclick="saveConfig()">UPDATE LIVE OVERLAY</button>
+    <div id="save-status">✓ อัปเดตขึ้นหน้าจอสดแล้ว!</div>
+
+    <script>
+        // โหลดข้อมูลเก่ามาแสดงตอนเปิดแผง
+        window.onload = function() {
+            const saved = localStorage.getItem('pubg_live_config');
+            if (saved) {
+                const cfg = JSON.parse(saved);
+                document.getElementById('inp-acc').value = cfg.accId || "";
+                document.getElementById('inp-tour').value = cfg.tourId || "";
+                document.getElementById('inp-t1').value = cfg.teams[0] || "";
+                document.getElementById('inp-t2').value = cfg.teams[1] || "";
+                document.getElementById('inp-t3').value = cfg.teams[2] || "";
+                document.getElementById('inp-t4').value = cfg.teams[3] || "";
+            } else {
+                // ค่าเริ่มต้นกันเหนียว
+                saveConfig(); 
+            }
+        };
+
+        // เซฟข้อมูลส่งไปให้ไฟล์ Overlay
+        function saveConfig() {
+            const config = {
+                accId: document.getElementById('inp-acc').value.trim(),
+                tourId: document.getElementById('inp-tour').value.trim(),
+                teams: [
+                    document.getElementById('inp-t1').value.trim(),
+                    document.getElementById('inp-t2').value.trim(),
+                    document.getElementById('inp-t3').value.trim(),
+                    document.getElementById('inp-t4').value.trim()
+                ]
+            };
+            localStorage.setItem('pubg_live_config', JSON.stringify(config));
+            
+            const status = document.getElementById('save-status');
+            status.style.opacity = "1";
+            setTimeout(() => { status.style.opacity = "0"; }, 2000);
+        }
+    </script>
+</body>
+</html>

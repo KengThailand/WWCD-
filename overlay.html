@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUBG WWCD Overlay (Locked Position)</title>
+    <style>
+        /* ==========================================================
+           🛠️ ปรับระยะห่างแยกแต่ละช่อง (ช่อง 1, 2, 3, 4)
+           ========================================================== */
+        #slot-0 { margin-right: 20px; } /* ปรับระยะห่างช่องที่ 1 */
+        #slot-1 { margin-right: 20px; } /* ปรับระยะห่างช่องที่ 2 */
+        #slot-2 { margin-right: 20px; } /* ปรับระยะห่างช่องที่ 3 */
+        #slot-3 { margin-right: 0px; }  /* ช่องสุดท้ายไม่ต้องเว้น */
+        /* ========================================================== */
+
+        :root {
+            --box-width: 245px;      
+            --top-position: 65px;   
+            color-scheme: light dark;
+        }
+
+        @font-face {
+            font-family: 'Transducer';
+            src: url('Transducer-CondensedMedium.otf') format('opentype');
+            font-weight: normal; font-style: normal;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600&display=swap');
+        
+        body {
+            margin: 0; padding: 0;
+            background-color: transparent !important;
+            font-family: 'Transducer', sans-serif;
+            color: #ffffff;
+            overflow: hidden;
+        }
+
+        .wwcd-container {
+            position: absolute;
+            top: var(--top-position); left: 50%;
+            transform: translateX(-50%);
+            display: flex; justify-content: center;
+            width: 100%; box-sizing: border-box;
+        }
+
+        .team-box {
+            display: flex; flex-direction: column;
+            width: var(--box-width); 
+            /* ✨ หัวใจสำคัญ: บล็อกจะอยู่กับที่ตลอดเวลา */
+            transition: opacity 0.8s ease, visibility 0.8s ease; 
+        }
+
+        .team-stats {
+            display: flex; justify-content: space-between; align-items: center;
+            background-color: rgba(15, 15, 15, 0.13); 
+            padding: 6px 15px; height: 42px; box-sizing: border-box;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9); 
+        }
+
+        .wwcd-label { font-size: 30px; letter-spacing: 0.5px; color: #eeeeee; }
+        .wwcd-percent {
+            font-family: 'Transducer', 'Teko', sans-serif;
+            font-size: 30px; font-style: italic; color: #ffffff;
+            display: inline-flex; align-items: center; line-height: 1.1; 
+        }
+
+        .odometer-wrapper { display: inline-flex; height: 1em; overflow: hidden; padding-right: 6px; }
+        .odometer-col { display: inline-flex; flex-direction: column; transition: transform 0.8s cubic-bezier(0.25, 1, 0.5, 1); text-align: center; }
+        .odometer-char { height: 1em; display: flex; align-items: center; justify-content: center; }
+        .percent-symbol { margin-left: -2px; }
+    </style>
+</head>
+<body>
+
+    <div class="wwcd-container" id="wwcd-container"></div>
+
+    <script>
+        let currentSlotCount = 4; // ล็อกไว้ที่ 4 ช่องตลอดกาลเพื่อให้ตำแหน่งไม่ขยับ
+
+        function getAPIUrl(accId, tourId) {
+            return `https://domestic.atum.live/api/pubg/liveleaderboard?account_id=${accId}&series=${tourId}&tournament_id=${tourId}&mode=post`;
+        }
+
+        // สร้างช่องไว้รอเลย 4 ช่อง
+        function initSlots() {
+            const wwcdContainer = document.getElementById("wwcd-container");
+            wwcdContainer.innerHTML = ''; 
+            for(let i=0; i<4; i++) {
+                wwcdContainer.innerHTML += `
+                    <div class="team-box" id="slot-${i}">
+                        <div class="team-stats" id="stats-${i}">
+                            <span class="wwcd-label">WWCD%</span>
+                            <div class="wwcd-percent"><span class="odometer-wrapper" id="odo-${i}"></span><span class="percent-symbol">%</span></div>
+                        </div>
+                    </div>`;
+            }
+        }
+
+        function updateRollingNumber(elementId, valueStr) {
+            const container = document.getElementById(elementId);
+            if(!container) return;
+            let parts = valueStr.split('.');
+            let intPart = parts[0].padStart(2, '0');
+            let decPart = parts[1] || "00";
+            let finalStr = `${intPart}.${decPart}`;
+
+            if (container.children.length !== finalStr.length) {
+                container.innerHTML = '';
+                for (let i = 0; i < finalStr.length; i++) {
+                    let col = document.createElement('div');
+                    col.className = 'odometer-col';
+                    if (!isNaN(finalStr[i])) { 
+                        col.classList.add('is-number');
+                        let trackHtml = '';
+                        for(let num=0; num<=9; num++) trackHtml += `<div class="odometer-char">${num}</div>`;
+                        col.innerHTML = trackHtml;
+                    } else { 
+                        col.innerHTML = `<div class="odometer-char">${finalStr[i]}</div>`;
+                    }
+                    container.appendChild(col);
+                }
+            }
+
+            setTimeout(() => {
+                const cols = container.querySelectorAll('.odometer-col');
+                for (let i = 0; i < finalStr.length; i++) {
+                    if (cols[i].classList.contains('is-number')) {
+                        const num = parseInt(finalStr[i]);
+                        let staggerDelay = (finalStr.length - 1 - i) * 0.05; 
+                        cols[i].style.transitionDelay = `${staggerDelay}s`;
+                        cols[i].style.transform = `translateY(-${num}em)`;
+                    }
+                }
+            }, 50); 
+        }
+
+        async function fetchOverlayData() {
+            const saved = localStorage.getItem('pubg_live_config');
+            if (!saved) return;
+            const cfg = JSON.parse(saved);
+            
+            const targetTeams = cfg.teams.filter(t => t !== "");
+
+            try {
+                const response = await fetch(getAPIUrl(cfg.accId, cfg.tourId));
+                const data = await response.json();
+
+                if (!data || !data.data || !data.data.teams) return;
+                const teamsData = data.data.teams;
+                
+                teamsData.forEach(team => {
+                    if (team.elimination || !team.live) {
+                        team.powerScore = 0; team.aliveCount = 0; return;
+                    }
+                    let aliveCount = 0; let totalHealth = 0;
+                    team.players.forEach(player => {
+                        const hp = player.health !== undefined ? player.health : (player.isAlive ? 100 : 0);
+                        if (player.isAlive || hp > 0) { aliveCount++; totalHealth += hp; }
+                    });
+                    team.aliveCount = aliveCount;
+                    team.powerScore = (aliveCount * 100) + totalHealth; 
+                });
+
+                let selectedTeams = [];
+                targetTeams.forEach(tag => {
+                    const found = teamsData.find(t => t.team_tag === tag);
+                    if (found) { selectedTeams.push(found); } 
+                    else { selectedTeams.push({ team_tag: tag, powerScore: 0, aliveCount: 0 }); }
+                });
+
+                // ตรวจสอบค่าก่อนแสดง
+                selectedTeams.forEach((team, i) => {
+                    const slot = document.getElementById(`slot-${i}`);
+                    const statsBox = document.getElementById(`stats-${i}`);
+
+                    if (team.aliveCount > 0) {
+                        // ทีมรอด: แสดงตัวเลข
+                        slot.style.opacity = "1";
+                        slot.style.visibility = "visible"; // ล็อกที่ไว้
+                        
+                        let totalSelectedPower = selectedTeams.reduce((acc, t) => acc + (t.powerScore || 0), 0);
+                        const wwcdPercent = totalSelectedPower > 0 ? ((team.powerScore / totalSelectedPower) * 100).toFixed(2) : "0.00"; 
+                        
+                        const color = team.team_color && team.team_color !== "#FFFFFF" ? team.team_color : "#ffcc00"; 
+                        if (statsBox) statsBox.style.borderTopColor = color;
+                        
+                        updateRollingNumber(`odo-${i}`, wwcdPercent);
+                    } else {
+                        // ทีมตาย: ซ่อนตัวเลขแต่ "ยังจองที่เดิมไว้"
+                        slot.style.opacity = "0";
+                        slot.style.visibility = "hidden"; // จองที่ไว้ไม่ให้บล็อกอื่นขยับ
+                    }
+                });
+
+            } catch (error) { console.error("Error fetching live data:", error); }
+        }
+
+        initSlots(); // สร้างช่องรอไว้ 4 ช่องถาวร
+        fetchOverlayData();
+        setInterval(fetchOverlayData, 3000);
+        window.addEventListener('storage', (e) => { if(e.key === 'pubg_live_config') fetchOverlayData(); });
+    </script>
+</body>
+</html>
